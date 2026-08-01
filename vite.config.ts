@@ -7,6 +7,17 @@ export default defineConfig({
     host: '127.0.0.1',
     port: 5188,
     strictPort: true,
+    proxy: {
+      '/api-server': {
+        target: 'http://127.0.0.1:8642',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api-server/, ''),
+      },
+      '/tts': {
+        target: 'http://127.0.0.1:3000',
+        changeOrigin: true,
+      },
+    },
   },
   preview: {
     host: '127.0.0.1',

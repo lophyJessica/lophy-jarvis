@@ -1,3 +1,5 @@
+import type { SyncMessage } from '../db'
+
 export type ChatRole = 'user' | 'assistant' | 'system'
 
 export interface ChatMessage {
@@ -7,7 +9,8 @@ export interface ChatMessage {
 
 const apiUrl = '/api-server'
 const apiKey = import.meta.env.VITE_HERMES_API_KEY ?? ''
-const defaultSystemPrompt = '你是贾维斯，用户的个人 AI 助手。用户叫刘龙飞，也称路飞。'
+export const defaultSystemPrompt =
+  '你是妮可·罗宾，用户的考古学家 AI 伙伴。用户叫刘龙飞，也称路飞。请用沉稳、博学、略带神秘的语气回答，必要时引用历史与文献。'
 
 export const isHermesConfigured = Boolean(apiUrl && apiKey)
 
@@ -40,6 +43,89 @@ export async function checkHermesConnection() {
   } finally {
     window.clearTimeout(timeoutId)
   }
+}
+
+function normalizeHistoryRecord(raw: unknown, index: number): SyncMessage | null {
+  if (!raw || typeof raw !== 'object') return null
+  const record = raw as Record<string, unknown>
+  const role = record.role
+  const content = record.content
+  if (role !== 'user' && role !== 'assistant') return null
+  if (typeof content !== 'string') return null
+
+  const createdAtRaw = record.createdAt ?? record.created_at ?? record.time
+  const createdAt = typeof createdAtRaw === 'string' || typeof createdAtRaw === 'number'
+    ? String(createdAtRaw)
+    : new Date().toISOString()
+
+  const idRaw = record.id
+  const id = typeof idRaw === 'string' && idRaw.length > 0
+    ? idRaw
+    : `history-${index}-${createdAt}-${content.slice(0, 32)}`
+
+  return {
+    id,
+    role,
+    content,
+    createdAt,
+  }
+}
+
+function parseHistoryPayload(payload: unknown): SyncMessage[] {
+  if (Array.isArray(payload)) {
+    return payload
+      .map((item, index) => normalizeHistoryRecord(item, index))
+      .filter((item): item is SyncMessage => item !== null)
+  }
+
+  if (!payload || typeof payload !== 'object') return []
+
+  const record = payload as Record<string, unknown>
+  const candidates = [
+    record.messages,
+    record.history,
+    record.data,
+    record.items,
+  ]
+
+  for (const candidate of candidates) {
+    if (!Array.isArray(candidate)) continue
+    return candidate
+      .map((item, index) => normalizeHistoryRecord(item, index))
+      .filter((item): item is SyncMessage => item !== null)
+  }
+
+  return []
+}
+
+export async function fetchHistory(): Promise<SyncMessage[]> {
+  if (!isHermesConfigured) return []
+  const response = await fetch(`${apiUrl}/history`, {
+    headers: requestHeaders(),
+  })
+  if (!response.ok) {
+    throw new HermesError(`历史记录拉取失败（${response.status}）`, 'network')
+  }
+  const payload = await response.json() as unknown
+  const messages = parseHistoryPayload(payload)
+  return messages.sort((left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt))
+}
+
+export async function pushHistory(messages: SyncMessage[]) {
+  if (!isHermesConfigured) return
+  await fetch(`${apiUrl}/history`, {
+    method: 'POST',
+    headers: requestHeaders(),
+    body: JSON.stringify({ messages }),
+  })
+}
+
+export async function clearServerHistory() {
+  if (!isHermesConfigured) return
+  await fetch(`${apiUrl}/history`, {
+    method: 'DELETE',
+    headers: requestHeaders(),
+  })
 }
 
 export async function streamChatCompletion(
@@ -87,7 +173,7 @@ export async function streamChatCompletion(
 
     if (!response.ok) {
       if (response.status >= 500) {
-        throw new HermesError('贾维斯暂时不可用，请稍后再试', 'unavailable')
+        throw new HermesError('妮可·罗宾暂时不可用，请稍后再试', 'unavailable')
       }
       throw new HermesError(`Hermes 请求失败（${response.status}）`, 'network')
     }

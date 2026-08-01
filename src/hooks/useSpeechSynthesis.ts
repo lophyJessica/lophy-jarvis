@@ -18,7 +18,7 @@ export function useSpeechSynthesis() {
     }
   }, [])
 
-  const stop = useCallback(() => {
+  const stopSpeaking = useCallback(() => {
     if (!isSupported) return
     requestIdRef.current += 1
     abortControllerRef.current?.abort()
@@ -33,12 +33,12 @@ export function useSpeechSynthesis() {
     setIsSpeaking(false)
   }, [isSupported, releaseObjectUrl])
 
-  useEffect(() => stop, [stop])
+  useEffect(() => stopSpeaking, [stopSpeaking])
 
   const speak = useCallback(async (text: string) => {
     const content = text.trim()
     if (!isSupported || !content) return
-    stop()
+    stopSpeaking()
 
     const requestId = requestIdRef.current + 1
     requestIdRef.current = requestId
@@ -76,14 +76,21 @@ export function useSpeechSynthesis() {
         setIsSpeaking(false)
       }
       await audio.play()
-    } catch (error) {
+    } catch {
       if (!abortController.signal.aborted && requestIdRef.current === requestId) {
         abortControllerRef.current = null
         releaseObjectUrl()
         setIsSpeaking(false)
       }
     }
-  }, [isSupported, releaseObjectUrl, stop])
+  }, [isSupported, releaseObjectUrl, stopSpeaking])
 
-  return { speak, stop, cancel: stop, isSpeaking, isSupported }
+  return {
+    speak,
+    stop: stopSpeaking,
+    stopSpeaking,
+    cancel: stopSpeaking,
+    isSpeaking,
+    isSupported,
+  }
 }

@@ -275,5 +275,5 @@ export default function JarvisCore({ status }: JarvisCoreProps) {
     }
   }, [])
 
-  return <canvas ref={canvasRef} className="jarvis-core" aria-label={`Jarvis ${status} animation`} />
+  return <canvas ref={canvasRef} className="jarvis-core" aria-label={`妮可·罗宾 ${status} animation`} />
 }
