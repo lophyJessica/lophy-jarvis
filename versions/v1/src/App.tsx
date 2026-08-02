@@ -24,7 +24,6 @@ import {
   defaultSystemPrompt,
   HermesError,
   isHermesConfigured,
-  requestTimeoutMs,
   streamChatCompletion,
 } from './api/hermes'
 import JarvisCore, { type JarvisStatus } from './components/JarvisCore'
@@ -64,7 +63,6 @@ const hermesApiKey = import.meta.env.VITE_HERMES_API_KEY ?? ''
 const assistantName = '妮可·罗宾'
 const systemPrompt = defaultSystemPrompt
 const maxSavedMessages = 200
-const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
 let sharedHistoryHydrationPromise: Promise<void> | null = null
 let sharedServerHydrated = false
 const zhMessageClock = new Intl.DateTimeFormat('zh-CN', {
@@ -89,7 +87,6 @@ function historySyncHeaders(): Record<string, string> {
 async function fetchJarvisHistoryGet(limit: number) {
   const response = await fetch(`${jh}?limit=${limit}`, {
     headers: historySyncHeaders(),
-    signal: AbortSignal.timeout(requestTimeoutMs),
   })
   return handleJarvisAuthResponse(response)
 }
@@ -113,7 +110,6 @@ async function postChatHistoryToServer(
     method: 'POST',
     headers: historySyncHeaders(),
     body: JSON.stringify({ messages: payload }),
-    signal: AbortSignal.timeout(requestTimeoutMs),
   }).then(handleJarvisAuthResponse)
 }
 
@@ -140,7 +136,6 @@ function fetchJarvisHistoryDelete() {
   return fetch(jh, {
     method: 'DELETE',
     headers: historySyncHeaders(),
-    signal: AbortSignal.timeout(requestTimeoutMs),
   }).then(handleJarvisAuthResponse)
 }
 
@@ -877,7 +872,7 @@ function ConsoleApp({
     }
 
     const controller = new AbortController()
-    const timeoutId = window.setTimeout(() => controller.abort(), requestTimeoutMs)
+    const timeoutId = window.setTimeout(() => controller.abort(), 8_000)
     fetch(`${_a}/v1/models`, {
       headers: historySyncHeaders(),
       signal: controller.signal,
@@ -1319,7 +1314,7 @@ function AppShell() {
     setUsername(loggedInUsername)
   }, [])
 
-  if (!authToken && !isDev) {
+  if (!authToken) {
     return <LoginPage onSuccess={handleLoginSuccess} />
   }
 

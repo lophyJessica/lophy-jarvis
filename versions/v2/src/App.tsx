@@ -24,7 +24,6 @@ import {
   defaultSystemPrompt,
   HermesError,
   isHermesConfigured,
-  requestTimeoutMs,
   streamChatCompletion,
 } from './api/hermes'
 import JarvisCore, { type JarvisStatus } from './components/JarvisCore'
@@ -64,7 +63,6 @@ const hermesApiKey = import.meta.env.VITE_HERMES_API_KEY ?? ''
 const assistantName = '妮可·罗宾'
 const systemPrompt = defaultSystemPrompt
 const maxSavedMessages = 200
-const isDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
 let sharedHistoryHydrationPromise: Promise<void> | null = null
 let sharedServerHydrated = false
 const zhMessageClock = new Intl.DateTimeFormat('zh-CN', {
@@ -89,7 +87,6 @@ function historySyncHeaders(): Record<string, string> {
 async function fetchJarvisHistoryGet(limit: number) {
   const response = await fetch(`${jh}?limit=${limit}`, {
     headers: historySyncHeaders(),
-    signal: AbortSignal.timeout(requestTimeoutMs),
   })
   return handleJarvisAuthResponse(response)
 }
@@ -113,7 +110,6 @@ async function postChatHistoryToServer(
     method: 'POST',
     headers: historySyncHeaders(),
     body: JSON.stringify({ messages: payload }),
-    signal: AbortSignal.timeout(requestTimeoutMs),
   }).then(handleJarvisAuthResponse)
 }
 
@@ -140,7 +136,6 @@ function fetchJarvisHistoryDelete() {
   return fetch(jh, {
     method: 'DELETE',
     headers: historySyncHeaders(),
-    signal: AbortSignal.timeout(requestTimeoutMs),
   }).then(handleJarvisAuthResponse)
 }
 
@@ -640,6 +635,7 @@ function ConsoleApp({
     isHermesConfigured ? 'checking' : 'unconfigured',
   )
   const mockTextareaMode = new URLSearchParams(window.location.search).has('mock-textarea')
+  const testImageMode = new URLSearchParams(window.location.search).has('test-image')
   const messageListRef = useRef<HTMLElement>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const stickToBottomRef = useRef(true)
@@ -877,7 +873,7 @@ function ConsoleApp({
     }
 
     const controller = new AbortController()
-    const timeoutId = window.setTimeout(() => controller.abort(), requestTimeoutMs)
+    const timeoutId = window.setTimeout(() => controller.abort(), 8_000)
     fetch(`${_a}/v1/models`, {
       headers: historySyncHeaders(),
       signal: controller.signal,
@@ -930,6 +926,21 @@ function ConsoleApp({
     const dataUrls = await Promise.all(imageFiles.map(readImageFile))
     setPendingImages((current) => [...current, ...dataUrls].slice(-6))
   }, [])
+
+  useEffect(() => {
+    if (!testImageMode) return
+    const canvas = document.createElement('canvas')
+    canvas.width = 100
+    canvas.height = 100
+    const context = canvas.getContext('2d')
+    if (!context) return
+    context.fillStyle = '#ff0000'
+    context.fillRect(0, 0, canvas.width, canvas.height)
+    canvas.toBlob((blob) => {
+      if (!blob) return
+      void appendImages([new File([blob], 'multimodal-red-square.png', { type: 'image/png' })])
+    }, 'image/png')
+  }, [appendImages, testImageMode])
 
   const handleComposerPaste = useCallback((event: ClipboardEvent<HTMLTextAreaElement>) => {
     const items = event.clipboardData?.items
@@ -991,7 +1002,7 @@ function ConsoleApp({
       if (speechEnabled && synthesisSupported) {
         speak(responseText.replace(/[#*_`>]/g, '').replaceAll('[', '').replaceAll(']', ''))
       }
-      shouldUploadHistory = !mockTextareaMode
+      shouldUploadHistory = !mockTextareaMode && !testImageMode
     } catch (error) {
       if (requestController.signal.aborted) {
         void persistMessages(afterUserMessages)
@@ -1006,7 +1017,7 @@ function ConsoleApp({
       messagesToPersist = [...afterUserMessages, createStoredMessage('assistant', fallback)]
       applyConversationMessages(messagesToPersist)
       void messageApi.error(fallback)
-      shouldUploadHistory = !mockTextareaMode
+      shouldUploadHistory = !mockTextareaMode && !testImageMode
     } finally {
       setIsThinking(false)
       activeRequestRef.current = null
@@ -1031,6 +1042,7 @@ function ConsoleApp({
     stopListening,
     stopSpeaking,
     synthesisSupported,
+    testImageMode,
   ])
 
   const clearConversation = useCallback(async () => {
@@ -1283,6 +1295,7 @@ function AppShell() {
   const { message: messageApi } = AntApp.useApp()
   const [authToken, setAuthToken] = useState(() => getJarvisToken())
   const [username, setUsername] = useState(() => localStorage.getItem(JARVIS_USERNAME_KEY) ?? '')
+  const testImageMode = new URLSearchParams(window.location.search).has('test-image')
 
   const performLogout = useCallback(async (showExpiredMessage = false) => {
     clearJarvisAuth()
@@ -1319,7 +1332,7 @@ function AppShell() {
     setUsername(loggedInUsername)
   }, [])
 
-  if (!authToken && !isDev) {
+  if (!authToken && !testImageMode) {
     return <LoginPage onSuccess={handleLoginSuccess} />
   }
 

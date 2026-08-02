@@ -24,7 +24,6 @@ import {
   defaultSystemPrompt,
   HermesError,
   isHermesConfigured,
-  requestTimeoutMs,
   streamChatCompletion,
 } from './api/hermes'
 import JarvisCore, { type JarvisStatus } from './components/JarvisCore'
@@ -89,7 +88,6 @@ function historySyncHeaders(): Record<string, string> {
 async function fetchJarvisHistoryGet(limit: number) {
   const response = await fetch(`${jh}?limit=${limit}`, {
     headers: historySyncHeaders(),
-    signal: AbortSignal.timeout(requestTimeoutMs),
   })
   return handleJarvisAuthResponse(response)
 }
@@ -113,7 +111,6 @@ async function postChatHistoryToServer(
     method: 'POST',
     headers: historySyncHeaders(),
     body: JSON.stringify({ messages: payload }),
-    signal: AbortSignal.timeout(requestTimeoutMs),
   }).then(handleJarvisAuthResponse)
 }
 
@@ -140,7 +137,6 @@ function fetchJarvisHistoryDelete() {
   return fetch(jh, {
     method: 'DELETE',
     headers: historySyncHeaders(),
-    signal: AbortSignal.timeout(requestTimeoutMs),
   }).then(handleJarvisAuthResponse)
 }
 
@@ -877,7 +873,7 @@ function ConsoleApp({
     }
 
     const controller = new AbortController()
-    const timeoutId = window.setTimeout(() => controller.abort(), requestTimeoutMs)
+    const timeoutId = window.setTimeout(() => controller.abort(), 8_000)
     fetch(`${_a}/v1/models`, {
       headers: historySyncHeaders(),
       signal: controller.signal,

@@ -1,0 +1,27 @@
+POST /p/jarvis/v1/chat/completions
+
+[
+  {
+    "method": "POST",
+    "path": "/p/jarvis/v1/chat/completions",
+    "content": [
+      {
+        "type": "text",
+        "text": "请描述这张测试图。"
+      },
+      {
+        "type": "image_url",
+        "image_url": {
+          "url": "data:image/jpeg;base64,/9j/4AAQS..."
+        }
+      }
+    ],
+    "contentKind": "array"
+  },
+  {
+    "method": "POST",
+    "path": "/p/jarvis/v1/chat/completions",
+    "content": "纯文本回归测试：请回复收到。",
+    "contentKind": "string"
+  }
+]

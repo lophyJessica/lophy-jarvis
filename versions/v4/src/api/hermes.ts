@@ -12,7 +12,6 @@ export interface ChatMessage {
 const apiUrl = '/api-server'
 const historyUrl = '/p/jarvis/history'
 const apiKey = import.meta.env.VITE_HERMES_API_KEY ?? ''
-export const requestTimeoutMs = 120_000
 export const defaultSystemPrompt =
   '你是妮可·罗宾，用户的考古学家 AI 伙伴。用户叫刘龙飞，也称路飞。请用沉稳、博学、略带神秘的语气回答，必要时引用历史与文献。'
 
@@ -39,7 +38,7 @@ export class HermesError extends Error {
 export async function checkHermesConnection() {
   if (!isHermesConfigured) return false
   const controller = new AbortController()
-  const timeoutId = window.setTimeout(() => controller.abort(), requestTimeoutMs)
+  const timeoutId = window.setTimeout(() => controller.abort(), 8_000)
   try {
     const response = handleJarvisAuthResponse(
       await fetch(`${apiUrl}/v1/models`, {
@@ -113,7 +112,6 @@ export async function fetchHistory(limit = 50): Promise<SyncMessage[]> {
   const query = limit > 0 ? `?limit=${limit}` : ''
   const response = await fetch(`${historyUrl}${query}`, {
     headers: requestHeaders(),
-    signal: AbortSignal.timeout(requestTimeoutMs),
   })
   if (!response.ok) {
     throw new HermesError(`历史记录拉取失败（${response.status}）`, 'network')
@@ -129,7 +127,6 @@ export async function pushHistory(messages: SyncMessage[]) {
     method: 'POST',
     headers: requestHeaders(),
     body: JSON.stringify({ messages }),
-    signal: AbortSignal.timeout(requestTimeoutMs),
   })
   if (!response.ok) {
     throw new HermesError(`历史记录同步失败（${response.status}）`, 'network')
@@ -141,7 +138,6 @@ export async function clearServerHistory() {
   const response = await fetch(historyUrl, {
     method: 'DELETE',
     headers: requestHeaders(),
-    signal: AbortSignal.timeout(requestTimeoutMs),
   })
   if (!response.ok) {
     throw new HermesError(`历史记录清除失败（${response.status}）`, 'network')
@@ -167,7 +163,7 @@ export async function streamChatCompletion(
     timeoutId = window.setTimeout(() => {
       timedOut = true
       controller.abort()
-    }, requestTimeoutMs)
+    }, 30_000)
   }
   const abortFromExternal = () => controller.abort()
   externalSignal?.addEventListener('abort', abortFromExternal, { once: true })

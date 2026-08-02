@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="820" viewBox="0 0 1200 820">
+  <rect width="1200" height="820" fill="#0a0e27"/>
+  <text x="48" y="58" fill="#ffffff" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="26" font-weight="700">实际 POST /p/jarvis/v1/chat/completions 请求体捕获</text>
+  <rect x="48" y="88" width="1104" height="680" rx="6" fill="#10172f" stroke="#334155"/>
+  <text x="76" y="126" fill="#e2e8f0" font-family="Menlo, Monaco, monospace" font-size="17">
+    <tspan x="76" dy="0">[</tspan>
+    <tspan x="76" dy="25">  {</tspan>
+    <tspan x="76" dy="25">    "method": "POST",</tspan>
+    <tspan x="76" dy="25">    "path": "/p/jarvis/v1/chat/completions",</tspan>
+    <tspan x="76" dy="25">    "content": [</tspan>
+    <tspan x="76" dy="25">      { "type": "text", "text": "请描述这张测试图。" },</tspan>
+    <tspan x="76" dy="25">      {</tspan>
+    <tspan x="76" dy="25">        "type": "image_url",</tspan>
+    <tspan x="76" dy="25">        "image_url": { "url": "data:image/jpeg;base64,/9j/4AAQS..." }</tspan>
+    <tspan x="76" dy="25">      }</tspan>
+    <tspan x="76" dy="25">    ],</tspan>
+    <tspan x="76" dy="25">    "contentKind": "array"</tspan>
+    <tspan x="76" dy="25">  },</tspan>
+    <tspan x="76" dy="25">  {</tspan>
+    <tspan x="76" dy="25">    "method": "POST",</tspan>
+    <tspan x="76" dy="25">    "path": "/p/jarvis/v1/chat/completions",</tspan>
+    <tspan x="76" dy="25">    "content": "纯文本回归测试：请回复收到。",</tspan>
+    <tspan x="76" dy="25">    "contentKind": "string"</tspan>
+    <tspan x="76" dy="25">  }</tspan>
+    <tspan x="76" dy="25">]</tspan>
+  </text>
+  <text x="48" y="800" fill="#94a3b8" font-family="-apple-system, BlinkMacSystemFont, sans-serif" font-size="14">图片 data URL 仅保留前缀，完整请求已由本地捕获服务接收。</text>
+</svg>
