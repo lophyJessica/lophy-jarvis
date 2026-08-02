@@ -4,8 +4,7 @@ export interface StoredMessage {
   id: string
   role: 'user' | 'assistant'
   content: string
-  time: string
-  updatedAt: number
+  createdAt: string
 }
 
 export interface SyncMessage {
@@ -19,16 +18,43 @@ const dbName = 'jarvis-console'
 const storeName = 'messages'
 const dbVersion = 1
 
-const timeFormatter = new Intl.DateTimeFormat('zh-CN', {
-  hour: '2-digit',
-  minute: '2-digit',
-  hour12: false,
-})
+function isIsoTimestamp(value: string) {
+  const parsed = Date.parse(value)
+  return !Number.isNaN(parsed)
+}
 
-function formatTime(value?: string | number) {
-  if (value === undefined) return timeFormatter.format(new Date())
-  const date = typeof value === 'number' ? new Date(value) : new Date(value)
-  return Number.isNaN(date.getTime()) ? timeFormatter.format(new Date()) : timeFormatter.format(date)
+function migrateCreatedAt(record: Record<string, unknown>, index: number, total: number): string {
+  if (typeof record.createdAt === 'string' && record.createdAt.length > 0 && isIsoTimestamp(record.createdAt)) {
+    return record.createdAt
+  }
+  if (typeof record.created_at === 'string' && record.created_at.length > 0 && isIsoTimestamp(record.created_at)) {
+    return record.created_at
+  }
+  if (typeof record.updatedAt === 'number' && !Number.isNaN(record.updatedAt)) {
+    return new Date(record.updatedAt).toISOString()
+  }
+  const timeRaw = record.time
+  if (typeof timeRaw === 'string' && timeRaw.length > 0 && isIsoTimestamp(timeRaw)) {
+    return new Date(Date.parse(timeRaw)).toISOString()
+  }
+  return new Date(Date.now() - (total - index) * 1000).toISOString()
+}
+
+function migrateStoredRecord(record: Record<string, unknown>, index: number, total: number): StoredMessage | null {
+  const role = record.role
+  const content = record.content
+  if (role !== 'user' && role !== 'assistant') return null
+  if (typeof content !== 'string') return null
+
+  const idRaw = record.id
+  const id = typeof idRaw === 'string' && idRaw.length > 0 ? idRaw : `local-${index}`
+
+  return {
+    id,
+    role,
+    content,
+    createdAt: migrateCreatedAt(record, index, total),
+  }
 }
 
 function openDatabase(): Promise<IDBDatabase> {
@@ -63,15 +89,11 @@ async function withStore<T>(mode: IDBTransactionMode, run: (store: IDBObjectStor
 
 export async function getMessages(): Promise<StoredMessage[]> {
   const records = await withStore('readonly', (store) => store.getAll())
+  const total = records.length
   return records
-    .sort((left, right) => left.updatedAt - right.updatedAt)
-    .map((record) => ({
-      id: record.id,
-      role: record.role,
-      content: record.content,
-      time: record.time,
-      updatedAt: record.updatedAt,
-    }))
+    .map((record, index) => migrateStoredRecord(record as Record<string, unknown>, index, total))
+    .filter((message): message is StoredMessage => message !== null)
+    .sort((left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt))
 }
 
 export async function addMessage(message: StoredMessage): Promise<void> {
@@ -87,35 +109,45 @@ export function toSyncMessages(messages: StoredMessage[]): SyncMessage[] {
     id: message.id,
     role: message.role,
     content: message.content,
-    createdAt: new Date(message.updatedAt).toISOString(),
+    createdAt: message.createdAt,
   }))
+}
+
+function messageContentKey(message: { role: string; content: string; createdAt: string }) {
+  return `${message.role}\u0000${message.content}\u0000${message.createdAt}`
 }
 
 export function mergeMessages(local: StoredMessage[], server: SyncMessage[]): StoredMessage[] {
   const merged = new Map<string, StoredMessage>()
+  const contentKeys = new Set<string>()
 
   for (const message of server) {
-    const updatedAt = Date.parse(message.createdAt)
+    contentKeys.add(messageContentKey(message))
     merged.set(message.id, {
       id: message.id,
       role: message.role,
       content: message.content,
-      time: formatTime(message.createdAt),
-      updatedAt: Number.isNaN(updatedAt) ? Date.now() : updatedAt,
+      createdAt: message.createdAt,
     })
   }
 
   for (const message of local) {
     if (merged.has(message.id)) continue
+    const key = messageContentKey(message)
+    if (contentKeys.has(key)) continue
+    contentKeys.add(key)
     merged.set(message.id, message)
   }
 
-  return Array.from(merged.values()).sort((left, right) => left.updatedAt - right.updatedAt)
+  return Array.from(merged.values()).sort(
+    (left, right) => Date.parse(left.createdAt) - Date.parse(right.createdAt),
+  )
 }
 
 export async function syncFromServer(
   fetchHistory: () => Promise<SyncMessage[]>,
   limit = 200,
+  pushHistory?: (payload: SyncMessage[]) => Promise<void>,
 ): Promise<StoredMessage[]> {
   const local = await getMessages()
   try {
@@ -124,6 +156,13 @@ export async function syncFromServer(
     await clearMessages()
     for (const message of merged) {
       await addMessage(message)
+    }
+    if (server.length === 0 && merged.length > 0 && pushHistory) {
+      try {
+        await pushHistory(toSyncMessages(merged))
+      } catch {
+        // Offline cache remains; server push can retry on next message.
+      }
     }
     return merged
   } catch {
@@ -143,13 +182,11 @@ export async function syncToServer(
 }
 
 export function createStoredMessage(role: 'user' | 'assistant', content: string): StoredMessage {
-  const updatedAt = Date.now()
   return {
     id: crypto.randomUUID(),
     role,
     content,
-    time: formatTime(updatedAt),
-    updatedAt,
+    createdAt: new Date().toISOString(),
   }
 }
 

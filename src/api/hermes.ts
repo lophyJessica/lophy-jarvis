@@ -1,3 +1,4 @@
+import { buildJarvisAuthHeaders, handleJarvisAuthResponse } from '../auth'
 import type { SyncMessage } from '../db'
 
 export type ChatRole = 'user' | 'assistant' | 'system'
@@ -8,6 +9,7 @@ export interface ChatMessage {
 }
 
 const apiUrl = '/api-server'
+const historyUrl = '/p/jarvis/history'
 const apiKey = import.meta.env.VITE_HERMES_API_KEY ?? ''
 export const defaultSystemPrompt =
   '你是妮可·罗宾，用户的考古学家 AI 伙伴。用户叫刘龙飞，也称路飞。请用沉稳、博学、略带神秘的语气回答，必要时引用历史与文献。'
@@ -15,14 +17,18 @@ export const defaultSystemPrompt =
 export const isHermesConfigured = Boolean(apiUrl && apiKey)
 
 function requestHeaders() {
-  return {
-    'Content-Type': 'application/json',
-    'X-Hermes-Key': apiKey,
+  const headers = buildJarvisAuthHeaders()
+  if (apiKey) {
+    headers['X-Hermes-Key'] = apiKey
   }
+  return headers
 }
 
 export class HermesError extends Error {
-  constructor(message: string, readonly kind: 'timeout' | 'network' | 'unavailable' | 'configuration') {
+  constructor(
+    message: string,
+    readonly kind: 'timeout' | 'network' | 'unavailable' | 'configuration' | 'unauthorized',
+  ) {
     super(message)
     this.name = 'HermesError'
   }
@@ -33,10 +39,12 @@ export async function checkHermesConnection() {
   const controller = new AbortController()
   const timeoutId = window.setTimeout(() => controller.abort(), 8_000)
   try {
-    const response = await fetch(`${apiUrl}/v1/models`, {
-      headers: requestHeaders(),
-      signal: controller.signal,
-    })
+    const response = handleJarvisAuthResponse(
+      await fetch(`${apiUrl}/v1/models`, {
+        headers: requestHeaders(),
+        signal: controller.signal,
+      }),
+    )
     return response.ok
   } catch {
     return false
@@ -98,9 +106,10 @@ function parseHistoryPayload(payload: unknown): SyncMessage[] {
   return []
 }
 
-export async function fetchHistory(): Promise<SyncMessage[]> {
+export async function fetchHistory(limit = 50): Promise<SyncMessage[]> {
   if (!isHermesConfigured) return []
-  const response = await fetch(`${apiUrl}/history`, {
+  const query = limit > 0 ? `?limit=${limit}` : ''
+  const response = await fetch(`${historyUrl}${query}`, {
     headers: requestHeaders(),
   })
   if (!response.ok) {
@@ -113,19 +122,25 @@ export async function fetchHistory(): Promise<SyncMessage[]> {
 
 export async function pushHistory(messages: SyncMessage[]) {
   if (!isHermesConfigured) return
-  await fetch(`${apiUrl}/history`, {
+  const response = await fetch(historyUrl, {
     method: 'POST',
     headers: requestHeaders(),
     body: JSON.stringify({ messages }),
   })
+  if (!response.ok) {
+    throw new HermesError(`历史记录同步失败（${response.status}）`, 'network')
+  }
 }
 
 export async function clearServerHistory() {
   if (!isHermesConfigured) return
-  await fetch(`${apiUrl}/history`, {
+  const response = await fetch(historyUrl, {
     method: 'DELETE',
     headers: requestHeaders(),
   })
+  if (!response.ok) {
+    throw new HermesError(`历史记录清除失败（${response.status}）`, 'network')
+  }
 }
 
 export async function streamChatCompletion(
@@ -160,18 +175,23 @@ export async function streamChatCompletion(
       ...messages,
     ]
 
-    const response = await fetch(`${apiUrl}/v1/chat/completions`, {
-      method: 'POST',
-      headers: requestHeaders(),
-      body: JSON.stringify({
-        model: 'hermes-agent',
-        messages: requestMessages,
-        stream: true,
+    const response = handleJarvisAuthResponse(
+      await fetch(`${apiUrl}/v1/chat/completions`, {
+        method: 'POST',
+        headers: requestHeaders(),
+        body: JSON.stringify({
+          model: 'hermes-agent',
+          messages: requestMessages,
+          stream: true,
+        }),
+        signal: controller.signal,
       }),
-      signal: controller.signal,
-    })
+    )
 
     if (!response.ok) {
+      if (response.status === 401) {
+        throw new HermesError('登录已过期，请重新登录', 'unauthorized')
+      }
       if (response.status >= 500) {
         throw new HermesError('妮可·罗宾暂时不可用，请稍后再试', 'unavailable')
       }

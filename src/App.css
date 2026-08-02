@@ -145,6 +145,66 @@
   letter-spacing: 0.14em;
 }
 
+.login-shell {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100dvh;
+  padding: 24px;
+  background:
+    radial-gradient(circle at 18% 48%, rgba(37, 99, 235, 0.13), transparent 34%),
+    linear-gradient(135deg, #080c22 0%, #0a0e27 58%, #080b1d 100%);
+}
+
+.login-card {
+  width: min(420px, 100%);
+  border: 1px solid rgba(148, 163, 184, 0.14);
+  border-radius: 22px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.28);
+}
+
+.login-card .ant-card-body {
+  padding: 32px 28px 28px;
+}
+
+.login-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.login-brand h3.ant-typography {
+  margin: 0 !important;
+  color: #0f172a;
+}
+
+.login-brand span.ant-typography {
+  color: rgba(15, 23, 42, 0.55);
+}
+
+.login-hint {
+  margin-bottom: 20px !important;
+  color: rgba(15, 23, 42, 0.55) !important;
+}
+
+.login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.login-label {
+  color: #334155;
+  font-size: 13px;
+}
+
+.login-error {
+  color: #dc2626;
+  font-size: 13px;
+}
+
 .conversation-panel.ant-card {
   display: flex;
   flex-direction: column;
@@ -352,11 +412,82 @@
   background: rgba(2, 6, 23, 0.42);
 }
 
+.message-bubble pre code {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: inherit;
+}
+
 .message-bubble pre {
   padding: 10px;
   overflow-x: auto;
   border-radius: 8px;
   background: rgba(2, 6, 23, 0.65);
+}
+
+.message-bubble .expand-content {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.message-bubble .expand-content.message-markdown {
+  white-space: normal;
+  word-break: normal;
+  overflow-wrap: anywhere;
+}
+
+.message-markdown pre {
+  padding: 10px;
+  overflow-x: auto;
+  border-radius: 8px;
+  background: rgba(2, 6, 23, 0.65);
+}
+
+.message-markdown pre code {
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.code-block {
+  position: relative;
+  overflow: hidden;
+  margin: 8px 0;
+  border-radius: 8px;
+  background: rgba(2, 6, 23, 0.65);
+  white-space: normal;
+}
+
+.code-block-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 12px;
+  font-size: 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.12);
+}
+
+.code-copy-btn {
+  padding: 0;
+  border: none;
+  color: #93c5fd;
+  font-size: 12px;
+  cursor: pointer;
+  background: transparent;
+}
+
+.code-copy-btn:hover {
+  color: #fff;
+}
+
+.code-block pre {
+  margin: 0;
+  padding: 12px;
+  overflow-x: auto;
+  border-radius: 0;
+  background: transparent;
 }
 
 .stream-caret {
